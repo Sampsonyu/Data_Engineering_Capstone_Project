@@ -1,6 +1,5 @@
 # Data_Engineering_Capstone_Project
 
-# Study of Immigration Data in the United States
 
 ## Project Summary
 
@@ -46,22 +45,8 @@ The project follows the follow steps:
 * Step 5: Complete Project Write Up
 
 
-
-## Step 1: Scope the Project and Gather Data
-
 ### Project Scope
 
-
-
-#### Technical Overview
-Project uses following technologies,
-
-+ AWS S3 Storage : To store inputs & outputs
-+ AWS Redshift as Date Warehouse for Analytics
-+ Juypter Notebooks
-+ Python
-+ Spark
-+ Libraries : Pandas & Pyspark
 
 
 ### Project Datasets
