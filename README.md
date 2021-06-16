@@ -26,7 +26,7 @@ Example questions we could explore with the final data set:
 + What time of year or month sees more immigration for certain areas?
 
 
-#### Technical Overview
+### Technical Overview
 Project uses following technologies:
 
 + AWS S3 Storage : To store inputs & outputs
@@ -43,10 +43,6 @@ The project follows the follow steps:
 * Step 3: Define the Data Modeli94port
 * Step 4: Run ETL to Model the Data
 * Step 5: Complete Project Write Up
-
-
-### Project Scope
-
 
 
 ### Project Datasets
