@@ -97,18 +97,24 @@ def process_immigration_data(spark, input_data, output_data):
 
     #    .withColumn('arrival_day', get_sas_day_udf(df_immigration_spark['arrdate'])) \
 
-        dim_immigration = df_immigration_spark.select(
-            col('cicid').alias('id'),
-            col('arrdate').alias('arr_ts'),
-            'arrival_year',
-            'arrival_month',
-            'country_of_bir',
-            'country_of_res',
-            'port_of_admission',
-            'mode',
-            'visa_category',
-            'visatype',
-            col('depdate').alias('dep_ts')) \
+        dim_immigration = df_immigration_spark \
+            .filter(df_immigration_spark['country_of_bir'].isNotNull()) \
+            .filter(df_immigration_spark['country_of_res'].isNotNull()) \
+            .filter(df_immigration_spark['arrdate'].isNotNull()) \
+            .filter(df_immigration_spark['depdate'].isNotNull()) \
+            .filter(df_immigration_spark['port_of_admission'].isNotNull()) \
+            .select(
+                col('cicid').alias('id'),
+                col('arrdate').alias('arr_ts'),
+                'arrival_year',
+                'arrival_month',
+                'country_of_bir',
+                'country_of_res',
+                'port_of_admission',
+                'mode',
+                'visa_category',
+                'visatype',
+                col('depdate').alias('dep_ts')) \
             .dropDuplicates()
 
         # immigration_out_path = os.path.join(output_data, 'fact_immigration/')
@@ -124,7 +130,7 @@ def process_immigration_data(spark, input_data, output_data):
         print("Processing time dimension spark dataframe")
         dim_time = df_time_spark.withColumn('date', convert_sas_date_udf(df_time_spark['time']))
 
-        dim_time = dim_time\
+        dim_time = dim_time \
             .select(
                 col('time').alias('time_id')
                 , col('date').alias('date')
@@ -233,6 +239,9 @@ def process_demographics_data(spark, input_data, output_data):
               (dim_port_dict['city_name'] == df_demographics_spark_pivot['city']) & (
                           dim_port_dict['state_name'] == df_demographics_spark_pivot['state']), "inner") \
         .drop("city_name", "state_name")
+
+    dim_demographics = dim_demographics\
+        .filter(dim_demographics['port_code'].isNotNull()) \
 
     # demographics_out_path = os.path.join(output_data, 'dim_demographics/')
     demographics_out_path = output_data + 'dim_demographics/'
@@ -533,11 +542,22 @@ def check_data_quality(spark, output_data):
     tables = {
         "fact_immigration": output_data + "fact_immigration/arrival_year=2016/*/*.parquet",
         "dim_time": output_data + "dim_time/*/*.parquet",
-        "dim_demographics": output_data + "dim_demographics/*/*.parquet",
-        "dim_airport": output_data + "dim_airport/*.parquet",
-        "dim_temperature": output_data + "dim_temperature/*/*.parquet",
         "dim_immigrant": output_data + "dim_immigrant/*/*.parquet",
-        "dim_country": output_data + "dim_country/*.parquet"
+        "dim_country": output_data + "dim_country/*.parquet",
+        "dim_demographics": output_data + "dim_demographics/*/*.parquet",
+        "dim_airport": output_data + "dim_airport/*.parquet"
+    }
+    # "dim_temperature": output_data + "dim_temperature/*/*.parquet"
+    # "dim_time": output_data + "dim_time/*/*.parquet",
+    # "dim_demographics": output_data + "dim_demographics/*/*.parquet",
+    # "dim_airport": output_data + "dim_airport/*.parquet",
+    # "dim_immigrant": output_data + "dim_immigrant/*/*.parquet",
+    # "dim_country": output_data + "dim_country/*.parquet"
+    columns_to_check = {
+        'fact_immigration': ['id', 'port_of_admission'],
+        'dim_time': ['time_id'],
+        'dim_demographics': ['port_code'],
+        'dim_airport': ['local_code']
     }
 
     for table_name, path in tables.items():
@@ -550,8 +570,26 @@ def check_data_quality(spark, output_data):
         else:
             print(f"Data quality check passed for {table_name} with {total_count:,} records.")
 
+        if table_name in columns_to_check.keys():
+            check_key_notnull(table_name, df, columns_to_check)
+
     print('Finished checking data quality.')
     return 0
+
+
+def check_key_notnull(table, df, columns_to_check):
+    """"
+    This function performs null value checks on specific columns of a given table.
+    Specifically, this function is to check there is no NULL value for PK and FK columns in fact table
+    """
+
+    print(f"Performing key_not_null check on table {table}...")
+    for column in columns_to_check[table]:
+        num_of_null = df.filter(df[column].isNull()).count()
+        if num_of_null > 0:
+            raise ValueError(f"Data quality check failed! Found NULL values in {column} column in {table}!")
+    print(f"Data quality check on {table} passed. All key columns have no null value")
+    print(f"Finished key_not_null check on table {table}...")
 
 
 def main():
@@ -565,18 +603,18 @@ def main():
     spark = create_spark_session()
 
     # specify input data folder # input_data = 's3a://udacity-dend/'
-    input_data = 'data/'
+    input_data = '../Data_Engineering_Capstone_Project_local2/data/'
     # specify output data folder # output_data = 's3://sparkifydatasource/spark_output/'
-    output_data = 'data/output/'
+    output_data = '../data_folder/output/'
 
     # dim_demographics
-    # process_demographics_data(spark, input_data, output_data)
+    process_demographics_data(spark, input_data, output_data)
     # dim_airport
-    # process_airport_data(spark, input_data, output_data)
+    process_airport_data(spark, input_data, output_data)
     # dim_immigrant, dim_time, fact_immigration
-    # process_immigration_data(spark, input_data, output_data)
+    process_immigration_data(spark, input_data, output_data)
     # dim_temperature
-    # process_temperature_data(spark, input_data, output_data)
+    process_temperature_data(spark, input_data, output_data)
 
     print('ETL process finished!')
     check_data_quality(spark, output_data)
