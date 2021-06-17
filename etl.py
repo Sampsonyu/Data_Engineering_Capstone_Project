@@ -277,7 +277,9 @@ def process_airport_data(spark, input_data, output_data):
                 (col("type") == "medium_airport"))\
         .filter(df_airport_spark["iso_country"] == "US")\
         .filter(df_airport_spark['local_code'].isNotNull())\
-        .withColumn("state", substring(df_airport_spark["iso_region"], 4, 2))
+        .withColumn("state", substring(df_airport_spark["iso_region"], 4, 2)) \
+        .drop_duplicates(subset=['local_code'])
+
 #         .filter(df_airport_spark['iata_code'].isNotNull()) \
 
     # airport_out_path = os.path.join(output_data, 'dim_airport/')
@@ -560,6 +562,15 @@ def check_data_quality(spark, output_data):
         'dim_airport': ['local_code']
     }
 
+    primary_key = {
+        'fact_immigration': 'id',
+        'dim_time': 'time_id',
+        "dim_immigrant": 'immigrant_id',
+        'dim_demographics': 'port_code',
+        'dim_airport': 'local_code',
+        'dim_country': 'country_code'
+    }
+
     for table_name, path in tables.items():
         # quality check for table
         df = spark.read.parquet(path)
@@ -569,6 +580,8 @@ def check_data_quality(spark, output_data):
             print(f"Data quality check failed for {table_name} with zero records!")
         else:
             print(f"Data quality check passed for {table_name} with {total_count:,} records.")
+
+        check_key_isunique(table_name, df, primary_key, total_count)
 
         if table_name in columns_to_check.keys():
             check_key_notnull(table_name, df, columns_to_check)
@@ -589,7 +602,19 @@ def check_key_notnull(table, df, columns_to_check):
         if num_of_null > 0:
             raise ValueError(f"Data quality check failed! Found NULL values in {column} column in {table}!")
     print(f"Data quality check on {table} passed. All key columns have no null value")
-    print(f"Finished key_not_null check on table {table}...")
+
+
+def check_key_isunique(table, df, primary_key, total_count):
+    """"
+    This function performs null value checks on specific columns of a given table.
+    Specifically, this function is to check there is no NULL value for PK and FK columns in fact table
+    """
+
+    print(f"Performing key_is_unique check on table {table}...")
+    pk_column = primary_key[table]
+    if df.select(pk_column).distinct().count() != total_count:
+        raise ValueError(f"Data quality check failed! Values in {pk_column} column in {table} is not unique!")
+    print(f"Data quality check on {table} passed. Primary key column {pk_column} has unique value")
 
 
 def main():
